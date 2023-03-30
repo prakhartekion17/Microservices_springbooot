@@ -49,11 +49,11 @@ public class OrderService {
         InventoryResponse[] inventoryResponseArray=webClientBuilder.build().get()
                 .uri("http://inventory-service/api/inventory", uriBuilder ->uriBuilder.queryParam("skuCode",skuCodes).build())
                 .retrieve()
-                        .bodyToMono(InventoryResponse[].class)
-                                .block();
+                .bodyToMono(InventoryResponse[].class)
+                .block();
         boolean allProductsInStock = Arrays.stream(inventoryResponseArray).allMatch(InventoryResponse::isInStock);
         if(allProductsInStock)
-        orderRepository.save(order);
+            orderRepository.save(order);
         else
             throw new IllegalArgumentException("Product is not in stock, please try again later");
     }
