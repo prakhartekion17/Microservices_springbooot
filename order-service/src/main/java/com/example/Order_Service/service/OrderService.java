@@ -2,13 +2,17 @@ package com.example.Order_Service.service;
 
 import com.example.Order_Service.dto.InventoryResponse;
 import com.example.Order_Service.dto.OrderRequest;
+import com.example.Order_Service.event.OrderPlacedEvent;
 import com.example.Order_Service.model.Order;
 import com.example.Order_Service.model.OrderLineItems;
 import com.example.Order_Service.repository.OrderRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.kafka.support.serializer.JsonSerializer;
 
 import java.util.Arrays;
 import java.util.List;
@@ -17,12 +21,15 @@ import java.util.stream.Collectors;
 
 @Service
 @Transactional
+@Slf4j
 public class OrderService {
 
     @Autowired
     private OrderRepository orderRepository;
     @Autowired
     private WebClient.Builder webClientBuilder;
+
+    private KafkaTemplate <String, OrderPlacedEvent> kafkaTemplate;
 
     public void placeOrder(OrderRequest orderRequest)
     {
@@ -51,10 +58,19 @@ public class OrderService {
                 .retrieve()
                 .bodyToMono(InventoryResponse[].class)
                 .block();
+        log.info("now here");
+//        log.info(order.getOrderNumber());
+//        assert inventoryResponseArray != null;
         boolean allProductsInStock = Arrays.stream(inventoryResponseArray).allMatch(InventoryResponse::isInStock);
-        if(allProductsInStock)
+        log.info(String.valueOf(allProductsInStock==true));
+        if(allProductsInStock) {
             orderRepository.save(order);
-        else
+            log.info("Order number: "+order.getOrderNumber());
+//
+            kafkaTemplate.send("notificationTopic", new OrderPlacedEvent(order.getOrderNumber()));
+        }
+        else {
             throw new IllegalArgumentException("Product is not in stock, please try again later");
+        }
     }
 }
